@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
 )
 
 type counters struct {
@@ -26,8 +28,12 @@ func welcomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
+	// randomly pick content type
 	data := content[rand.Intn(len(content))]
+	log.Println("content", data)
 
+	// increment view counter
+	// CURRENTLY NOT MAPPED TO CONTENT TYPE
 	c.Lock()
 	c.view++
 	c.Unlock()
@@ -39,7 +45,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// simulate random click call
+	// simulate random click call - 50% odds
 	if rand.Intn(100) < 50 {
 		processClick(data)
 	}
@@ -51,6 +57,8 @@ func processRequest(r *http.Request) error {
 }
 
 func processClick(data string) error {
+	// DATA IS CURRENTLY NOT USED
+	// increment click counter
 	c.Lock()
 	c.click++
 	c.Unlock()
@@ -73,10 +81,30 @@ func uploadCounters() error {
 	return nil
 }
 
-func main() {
-	http.HandleFunc("/", welcomeHandler)
-	http.HandleFunc("/view/", viewHandler)
-	http.HandleFunc("/stats/", statsHandler)
+func printReq(w http.ResponseWriter, r *http.Request, next func()) {
+	log.Println("MIDDLEWARE 2")
+	next()
+}
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+func router() middleware.Handler {
+
+	var mux *http.ServeMux = http.NewServeMux()
+	mux.HandleFunc("/", welcomeHandler)
+	mux.HandleFunc("/view/", viewHandler)
+	mux.HandleFunc("/stats/", statsHandler)
+
+	return func(w http.ResponseWriter, r *http.Request, next func()) {
+		mux.ServeHTTP(w, r)
+	}
+}
+
+func listenHandler(port int) http.Handler {
+	log.Printf("Server listening on port %v\n", port)
+
+	return middleware.UseHandlers(middleware.Logger, printReq, router())
+}
+
+func main() {
+
+	log.Fatal(http.ListenAndServe(":8080", listenHandler(8080)))
 }
