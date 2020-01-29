@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
+	mware "github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
 )
 
 type counters struct {
@@ -67,6 +67,7 @@ func processClick(data string) error {
 }
 
 func statsHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("IN STATS")
 	if !isAllowed() {
 		w.WriteHeader(429)
 		return
@@ -86,12 +87,13 @@ func printReq(w http.ResponseWriter, r *http.Request, next func()) {
 	next()
 }
 
-func router() middleware.Handler {
+func router() mware.Handler {
 
 	var mux *http.ServeMux = http.NewServeMux()
 	mux.HandleFunc("/", welcomeHandler)
 	mux.HandleFunc("/view/", viewHandler)
-	mux.HandleFunc("/stats/", statsHandler)
+	// mux.HandleFunc("/stats/", statsHandler)
+	mux.Handle("/stats/", mware.UseHandlers(mware.WrapHttpHandler(statsHandler)))
 
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
 		mux.ServeHTTP(w, r)
@@ -100,11 +102,14 @@ func router() middleware.Handler {
 
 func listenHandler(port int) http.Handler {
 	log.Printf("Server listening on port %v\n", port)
-
-	return middleware.UseHandlers(middleware.Logger, printReq, router())
+	return http.DefaultServeMux
 }
 
 func main() {
 
+	// register middleware
+	http.Handle("/", mware.UseHandlers(mware.Logger, printReq, router()))
+
+	// start server
 	log.Fatal(http.ListenAndServe(":8080", listenHandler(8080)))
 }

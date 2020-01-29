@@ -30,3 +30,10 @@ func (s *HandlerSeries) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func UseHandlers(handlers ...Handler) *HandlerSeries {
 	return &HandlerSeries{handlers}
 }
+
+// wraps http handler in middleware handler. Should be placed last in middleware chain as next will not be called
+func WrapHttpHandler(httpHandler func(w http.ResponseWriter, r *http.Request)) Handler {
+	return func(w http.ResponseWriter, r *http.Request, next func()) {
+		httpHandler(w, r)
+	}
+}
