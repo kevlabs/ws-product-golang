@@ -5,21 +5,14 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
 
+	counters "github.com/kevlabs/eq-golang-server/src/server/lib/counters"
 	mware "github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
 )
 
-type counters struct {
-	sync.Mutex
-	view  int
-	click int
-}
-
 var (
-	c = counters{}
-
+	c       = counters.NewContentCounters()
 	content = []string{"sports", "entertainment", "business", "education"}
 )
 
@@ -29,14 +22,10 @@ func welcomeHandler(w http.ResponseWriter, r *http.Request) {
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	// randomly pick content type
-	data := content[rand.Intn(len(content))]
-	log.Println("content", data)
+	contentType := content[rand.Intn(len(content))]
 
 	// increment view counter
-	// CURRENTLY NOT MAPPED TO CONTENT TYPE
-	c.Lock()
-	c.view++
-	c.Unlock()
+	c.AddView(contentType)
 
 	err := processRequest(r)
 	if err != nil {
@@ -47,7 +36,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 	// simulate random click call - 50% odds
 	if rand.Intn(100) < 50 {
-		processClick(data)
+		processClick(contentType)
 	}
 }
 
@@ -56,13 +45,9 @@ func processRequest(r *http.Request) error {
 	return nil
 }
 
-func processClick(data string) error {
-	// DATA IS CURRENTLY NOT USED
+func processClick(contentType string) error {
 	// increment click counter
-	c.Lock()
-	c.click++
-	c.Unlock()
-
+	c.AddClick(contentType)
 	return nil
 }
 
@@ -82,8 +67,8 @@ func uploadCounters() error {
 	return nil
 }
 
-func printReq(w http.ResponseWriter, r *http.Request, next func()) {
-	log.Println("MIDDLEWARE 2")
+func printCounters(w http.ResponseWriter, r *http.Request, next func()) {
+	log.Println(c["sports"])
 	next()
 }
 
@@ -108,8 +93,35 @@ func listenHandler(port int) http.Handler {
 func main() {
 
 	// register middleware
-	http.Handle("/", mware.UseHandlers(mware.Logger, printReq, router()))
+	http.Handle("/", mware.UseHandlers(mware.Logger, printCounters, router()))
+
+	//
+	// dummy := newContentCounters("sports", "entertainment", "business", "education")
+	// dummy["sports"].view++
+	// log.Println(dummy["sports"].view)
+	// // log.Println(dummy)
+	// dummy.reset()
+	// log.Println(dummy["sports"].view)
+	// dummy["sports"] = counters{}
+	// val, ok := dummy["sports"]
+	// log.Println(dummy)
+	// log.Println(val, ok)
 
 	// start server
 	log.Fatal(http.ListenAndServe(":8080", listenHandler(8080)))
 }
+
+// counter interface
+// type counters struct {
+// 	sync.Mutex
+// 	view  int
+// 	click int
+// }
+
+// var (
+// 	c = counters{}
+
+// 	content = []string{"sports", "entertainment", "business", "education"}
+// )
+
+// mutex blocks so update operation needs to happen in a go routine so it doesn;t block main thread
