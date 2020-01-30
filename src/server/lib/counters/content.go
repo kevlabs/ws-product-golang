@@ -1,3 +1,7 @@
+/*
+Find in this file logic related to the in-memory storage of counters
+*/
+
 package counters
 
 import (
@@ -38,6 +42,7 @@ func (c *ContentCounters) clear() {
 	c.data = make(map[string]*Counters)
 }
 
+// reset data field to an empty map
 func (c *ContentCounters) Clear() {
 	c.Lock()
 	c.clear()
@@ -59,6 +64,8 @@ func (c *ContentCounters) Download(channel chan KeyCounters, clear bool) {
 	c.Unlock()
 }
 
+// retrieve counters based on content type and time
+// create counters if does not exist
 func (c *ContentCounters) getCounters(content string) *Counters {
 	key := fmt.Sprintf("%v:%v", content, time.Now().Format("2006-01-02 15:04"))
 

@@ -37,11 +37,6 @@ func router() mware.Handler {
 	}
 }
 
-func listenHandler(port int) http.Handler {
-	log.Printf("Server listening on port %v\n", port)
-	return http.DefaultServeMux
-}
-
 func main() {
 
 	stopUpload := make(chan bool)
@@ -52,5 +47,5 @@ func main() {
 	http.Handle("/", mware.UseHandlers(mware.Logger, printCounters, router()))
 
 	// start server
-	log.Fatal(http.ListenAndServe(":8080", listenHandler(8080)))
+	log.Fatal(http.ListenAndServe(":8080", mware.ListenHandler(8080)))
 }

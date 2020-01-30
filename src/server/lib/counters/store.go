@@ -1,3 +1,7 @@
+/*
+Find in this file logic related to the mock store including upload of data to it
+*/
+
 package counters
 
 import (
@@ -7,6 +11,7 @@ import (
 	"time"
 )
 
+// implemented with slice data structure
 type CountersStore struct {
 	sync.Mutex
 	data []KeyCounters
@@ -57,14 +62,13 @@ func UploadCounters(c *ContentCounters, s *CountersStore, intervalS int, done ch
 			go c.Download(incomingCounters, true)
 
 			for data := range incomingCounters {
-				fmt.Println("data received", data)
-
-				// upload to store
+				// upload chunk to store
 				s.Upload(data)
-
-				// print store content
-				s.PrintAll()
 			}
+
+			// print store content - for demo purposes only
+			fmt.Println("PRINTING STORE CONTENT")
+			s.PrintAll()
 		}
 	}
 }

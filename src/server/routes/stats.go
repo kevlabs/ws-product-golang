@@ -8,6 +8,7 @@ import (
 	mware "github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
 )
 
+// TO DO: replace with middleware
 func isAllowed() bool {
 	return true
 }
