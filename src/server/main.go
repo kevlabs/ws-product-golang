@@ -30,7 +30,7 @@ func router() mware.Handler {
 	var mux *http.ServeMux = http.NewServeMux()
 	mux.HandleFunc("/", welcomeHandler)
 	mux.Handle("/view/", routes.ViewHandler(liveCounters, content))
-	mux.Handle("/stats/", routes.StatsHandler(liveCounters, content))
+	mux.Handle("/stats/", routes.StatsHandler(liveCounters, countersStore, content))
 
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
 		mux.ServeHTTP(w, r)

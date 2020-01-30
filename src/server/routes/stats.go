@@ -13,7 +13,7 @@ func isAllowed() bool {
 	return true
 }
 
-func StatsHandler(c *counters.ContentCounters, content []string) *mware.HandlerSeries {
+func StatsHandler(c *counters.ContentCounters, s *counters.CountersStore, content []string) *mware.HandlerSeries {
 
 	statsHandler := func(w http.ResponseWriter, r *http.Request) {
 		log.Println("IN STATS")
@@ -21,7 +21,10 @@ func StatsHandler(c *counters.ContentCounters, content []string) *mware.HandlerS
 			w.WriteHeader(429)
 			return
 		}
+
+		log.Println("PRINTING STATS")
+		s.WriteAll(w)
 	}
 
-	return mware.UseHandlers(mware.WrapHttpHandler(statsHandler))
+	return mware.UseHandlers(mware.RateLimit(10, 60000), mware.WrapHttpHandler(statsHandler))
 }

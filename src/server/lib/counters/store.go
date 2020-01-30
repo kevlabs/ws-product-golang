@@ -6,6 +6,7 @@ package counters
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -29,17 +30,18 @@ func (s *CountersStore) Upload(data KeyCounters) {
 	s.Unlock()
 }
 
-func (s *CountersStore) PrintAll() {
-	var allCounters strings.Builder
-
-	// build data string
+func (s *CountersStore) WriteAll(w io.Writer) {
 	s.Lock()
+	// build data string
 	for _, data := range s.data {
-		fmt.Fprintf(&allCounters, "Key: %v, Views: %v, Clicks: %v\n", data.key, data.counters.view, data.counters.click)
+		fmt.Fprintf(w, "Key: %v, Views: %v, Clicks: %v\n", data.key, data.counters.view, data.counters.click)
 	}
 	s.Unlock()
+}
 
-	// print data string when ready
+func (s *CountersStore) PrintAll() {
+	var allCounters strings.Builder
+	s.WriteAll(&allCounters)
 	fmt.Print(allCounters.String())
 }
 
@@ -67,8 +69,8 @@ func UploadCounters(c *ContentCounters, s *CountersStore, intervalS int, done ch
 			}
 
 			// print store content - for demo purposes only
-			fmt.Println("PRINTING STORE CONTENT")
-			s.PrintAll()
+			// fmt.Println("PRINTING STORE CONTENT")
+			// s.PrintAll()
 		}
 	}
 }

@@ -19,22 +19,18 @@ type IPStore struct {
 
 func NewIPStore(lifespanMs int) *IPStore {
 	s := &IPStore{lifespanMs: lifespanMs}
-	s.Lock()
 	s.reset()
-	s.Unlock()
 	return s
 }
 
 // PUBLIC API
 
 func (s *IPStore) Has(key string) bool {
-	s.checkExpiry()
 	return s.nextStore.Has(key) || s.currentStore.Has(key)
 }
 
-// returns zero-value IPRecord
+// returns zero-value IPRecord if not set
 func (s *IPStore) Get(key string) *IPRecord {
-	s.checkExpiry()
 	if s.nextStore.Has(key) {
 		return s.nextStore.Get(key)
 	}
@@ -42,60 +38,63 @@ func (s *IPStore) Get(key string) *IPRecord {
 }
 
 func (s *IPStore) Set(key string, value *IPRecord) *IPStore {
-	s.checkExpiry()
 	// determines in which store to save key/value pair
 	s.getStore(value).Set(key, value)
 	return s
 }
 
 func (s *IPStore) Delete(key string) *IPStore {
-	s.checkExpiry()
 	s.currentStore.Delete(key)
 	s.nextStore.Delete(key)
 	return s
 }
 
-// UNEXPORTED METHODS
+// UNEXPORTED/PRIVATE METHODS
 
 func (s *IPStore) createStore(expiry time.Time) *InnerIPStore {
 	return NewInnerIPStore(expiry)
 }
 
-// replaces current store with next store and creates new next store
-func (s *IPStore) rollOver() *IPStore {
-	currentStore := s.nextStore
-	nextStore := s.createStore(currentStore.expiry.Add(time.Duration(s.lifespanMs) * time.Millisecond))
-
-	s.currentStore = currentStore
-	s.nextStore = nextStore
-
-	return s
-}
-
-// called at init or if both stores have expired
+// init or roll stores over
 func (s *IPStore) reset() *IPStore {
-	currentExpiry := time.Now().Add(time.Duration(s.lifespanMs) * time.Millisecond)
-	nextExpiry := currentExpiry.Add(time.Duration(s.lifespanMs) * time.Millisecond)
 
-	s.currentStore = s.createStore(currentExpiry)
+	s.Lock()
+
+	// init
+	if s.currentStore == nil {
+		currentExpiry := time.Now().Add(time.Duration(s.lifespanMs) * time.Millisecond)
+		nextExpiry := currentExpiry.Add(time.Duration(s.lifespanMs) * time.Millisecond)
+
+		s.currentStore = s.createStore(currentExpiry)
+		s.nextStore = s.createStore(nextExpiry)
+
+		s.Unlock()
+
+		// set up cleaning process
+		go s.cleanup()
+
+		return s
+	}
+
+	// rollover
+	nextExpiry := time.Now().Add(time.Duration(2*s.lifespanMs) * time.Millisecond)
+
+	s.currentStore = s.nextStore
 	s.nextStore = s.createStore(nextExpiry)
 
+	s.Unlock()
+
 	return s
 }
 
-// instead of setting up a job to run every 'lifespanMs' to roll over store, cleanup action is triggered when accessing store data
-func (s *IPStore) checkExpiry() *IPStore {
-	// if both stores have expired, reset otherwise roll over.
-	s.Lock()
-	if s.currentStore.IsExpired() {
-		if s.nextStore.IsExpired() {
-			s.reset()
-		} else {
-			s.rollOver()
-		}
+func (s *IPStore) cleanup() {
+	ticker := time.NewTicker(time.Duration(s.lifespanMs) * time.Millisecond)
+
+	for {
+		// await ticker
+		<-ticker.C
+		s.reset()
 	}
-	s.Unlock()
-	return s
 }
 
 // returns most current store that can accomodate expiry key in value object, or next store if key does not exist
