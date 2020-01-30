@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"time"
 
-	counters "github.com/kevlabs/eq-golang-server/src/server/lib/counters"
+	"github.com/kevlabs/eq-golang-server/src/server/lib/counters"
 	mware "github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
+	"github.com/kevlabs/eq-golang-server/src/server/routes"
 )
 
 var (
@@ -20,55 +20,38 @@ func welcomeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Welcome to EQ Works 😎")
 }
 
-func viewHandler(w http.ResponseWriter, r *http.Request) {
-	// randomly pick content type
-	contentType := content[rand.Intn(len(content))]
+func uploadCounters(c *counters.ContentCounters, done chan bool) {
 
-	// increment view counter
-	c.AddView(contentType)
+	// wait for 15 seconds
+	// <-time.After(time.Second * 10)
+	// fmt.Println("15 seconds in")
 
-	err := processRequest(r)
-	if err != nil {
-		fmt.Println(err)
-		w.WriteHeader(400)
-		return
+	// every 15s
+	ticker := time.NewTicker(time.Second * 10)
+
+	for {
+		select {
+		// exit process if done
+		case <-done:
+			return
+
+		// await ticker
+		case <-ticker.C:
+			fmt.Println("15 seconds have elapsed")
+
+			// create channel
+			incomingCounters := make(chan counters.KeyCounters)
+			go c.Download(incomingCounters, true)
+
+			for data := range incomingCounters {
+				fmt.Println("data received", data)
+			}
+		}
 	}
-
-	// simulate random click call - 50% odds
-	if rand.Intn(100) < 50 {
-		processClick(contentType)
-	}
-}
-
-func processRequest(r *http.Request) error {
-	time.Sleep(time.Duration(rand.Int31n(50)) * time.Millisecond)
-	return nil
-}
-
-func processClick(contentType string) error {
-	// increment click counter
-	c.AddClick(contentType)
-	return nil
-}
-
-func statsHandler(w http.ResponseWriter, r *http.Request) {
-	log.Println("IN STATS")
-	if !isAllowed() {
-		w.WriteHeader(429)
-		return
-	}
-}
-
-func isAllowed() bool {
-	return true
-}
-
-func uploadCounters() error {
-	return nil
 }
 
 func printCounters(w http.ResponseWriter, r *http.Request, next func()) {
-	log.Println(c["sports"])
+	// do nothing
 	next()
 }
 
@@ -76,9 +59,8 @@ func router() mware.Handler {
 
 	var mux *http.ServeMux = http.NewServeMux()
 	mux.HandleFunc("/", welcomeHandler)
-	mux.HandleFunc("/view/", viewHandler)
-	// mux.HandleFunc("/stats/", statsHandler)
-	mux.Handle("/stats/", mware.UseHandlers(mware.WrapHttpHandler(statsHandler)))
+	mux.Handle("/view/", routes.ViewHandler(c, content))
+	mux.Handle("/stats/", routes.StatsHandler(c, content))
 
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
 		mux.ServeHTTP(w, r)
@@ -92,36 +74,14 @@ func listenHandler(port int) http.Handler {
 
 func main() {
 
+	stopUpload := make(chan bool)
+	go uploadCounters(c, stopUpload)
+
 	// register middleware
 	http.Handle("/", mware.UseHandlers(mware.Logger, printCounters, router()))
-
-	//
-	// dummy := newContentCounters("sports", "entertainment", "business", "education")
-	// dummy["sports"].view++
-	// log.Println(dummy["sports"].view)
-	// // log.Println(dummy)
-	// dummy.reset()
-	// log.Println(dummy["sports"].view)
-	// dummy["sports"] = counters{}
-	// val, ok := dummy["sports"]
-	// log.Println(dummy)
-	// log.Println(val, ok)
 
 	// start server
 	log.Fatal(http.ListenAndServe(":8080", listenHandler(8080)))
 }
-
-// counter interface
-// type counters struct {
-// 	sync.Mutex
-// 	view  int
-// 	click int
-// }
-
-// var (
-// 	c = counters{}
-
-// 	content = []string{"sports", "entertainment", "business", "education"}
-// )
 
 // mutex blocks so update operation needs to happen in a go routine so it doesn;t block main thread
