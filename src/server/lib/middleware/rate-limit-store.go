@@ -12,13 +12,13 @@ import (
 
 type IPStore struct {
 	sync.Mutex
-	lifespanS    int
+	lifespanMs   int
 	currentStore *InnerIPStore
 	nextStore    *InnerIPStore
 }
 
-func NewIPStore(lifespanS int) *IPStore {
-	s := &IPStore{lifespanS: lifespanS}
+func NewIPStore(lifespanMs int) *IPStore {
+	s := &IPStore{lifespanMs: lifespanMs}
 	s.reset()
 	return s
 }
@@ -62,8 +62,8 @@ func (s *IPStore) reset() *IPStore {
 
 	// init
 	if s.currentStore == nil {
-		currentExpiry := time.Now().Add(time.Duration(s.lifespanS) * time.Second)
-		nextExpiry := currentExpiry.Add(time.Duration(s.lifespanS) * time.Second)
+		currentExpiry := time.Now().Add(time.Duration(s.lifespanMs) * time.Millisecond)
+		nextExpiry := currentExpiry.Add(time.Duration(s.lifespanMs) * time.Millisecond)
 
 		s.currentStore = s.createStore(currentExpiry)
 		s.nextStore = s.createStore(nextExpiry)
@@ -77,7 +77,7 @@ func (s *IPStore) reset() *IPStore {
 	}
 
 	// rollover
-	nextExpiry := time.Now().Add(time.Duration(2*s.lifespanS) * time.Second)
+	nextExpiry := time.Now().Add(time.Duration(2*s.lifespanMs) * time.Millisecond)
 
 	s.currentStore = s.nextStore
 	s.nextStore = s.createStore(nextExpiry)
@@ -88,7 +88,7 @@ func (s *IPStore) reset() *IPStore {
 }
 
 func (s *IPStore) cleanup() {
-	ticker := time.NewTicker(time.Duration(s.lifespanS) * time.Second)
+	ticker := time.NewTicker(time.Duration(s.lifespanMs) * time.Millisecond)
 
 	for {
 		// await ticker

@@ -14,15 +14,15 @@ import (
 
 type IPBucket struct {
 	sync.Mutex
-	Expiry    time.Time
-	limit     int
-	intervalS int
-	bucket    chan time.Time
-	done      chan bool
+	Expiry     time.Time
+	limit      int
+	intervalMs int
+	bucket     chan time.Time
+	done       chan bool
 }
 
-func NewIPBucket(limit int, burst int, intervalS int) *IPBucket {
-	b := &IPBucket{limit: limit, intervalS: intervalS}
+func NewIPBucket(limit int, burst int, intervalMs int) *IPBucket {
+	b := &IPBucket{limit: limit, intervalMs: intervalMs}
 	b.bucket = make(chan time.Time, burst)
 	b.done = make(chan bool)
 	b.setExpiry()
@@ -48,7 +48,7 @@ func (b *IPBucket) Fill() *IPBucket {
 
 // start auto-refilling process
 func (b *IPBucket) Start() {
-	ticker := time.NewTicker(time.Duration(b.intervalS/b.limit) * time.Second)
+	ticker := time.NewTicker(time.Duration(b.intervalMs/b.limit) * time.Millisecond)
 	for {
 		select {
 		case <-b.done:
@@ -73,7 +73,7 @@ func (b *IPBucket) Stop() *IPBucket {
 
 func (b *IPBucket) setExpiry() *IPBucket {
 	b.Lock()
-	b.Expiry = time.Now().Add(time.Duration(b.intervalS) * time.Second)
+	b.Expiry = time.Now().Add(time.Duration(b.intervalMs) * time.Millisecond)
 	b.Unlock()
 	return b
 }

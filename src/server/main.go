@@ -40,8 +40,8 @@ func router() mware.Handler {
 func main() {
 
 	stopUpload := make(chan bool)
-	// upload to store every 10 seconds
-	go counters.UploadCounters(liveCounters, countersStore, 10, stopUpload)
+	// upload to store every 5 seconds
+	go counters.UploadCounters(liveCounters, countersStore, 5000, stopUpload)
 
 	// register app-level middleware
 	http.Handle("/", mware.UseHandlers(mware.Logger, printCounters, router()))

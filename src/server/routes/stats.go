@@ -17,5 +17,5 @@ func StatsHandler(c *counters.ContentCounters, s *counters.CountersStore, conten
 	// use rate-limit middleware
 	// bucket burst: 10, refill rate: 1/s (for reference Shopify's API has a burst of 40 and a refill rate of 2/s)
 	// rate is voluntarily low for dev purposes
-	return mware.UseHandlers(mware.RateLimit(2, 40, 1), mware.WrapHttpHandler(statsHandler))
+	return mware.UseHandlers(mware.RateLimit(1, 10, 1000), mware.WrapHttpHandler(statsHandler))
 }

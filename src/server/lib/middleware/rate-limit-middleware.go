@@ -6,16 +6,28 @@ Implements the token bucket algorithm (https://en.wikipedia.org/wiki/Token_bucke
 package middleware
 
 import (
+	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 )
 
-func RateLimit(limit int, burst int, intervalS int) Handler {
+func RateLimit(limit int, burst int, intervalMs int) Handler {
 
 	// instantiate store to save IP/counter pairs
-	store := NewIPStore(intervalS)
+	store := NewIPStore(intervalMs)
+
+	// approximate limit policy
+	var policyQuota, policyWindow int
+	if tokensPerSecond := 1000 * limit / intervalMs; tokensPerSecond == 0 {
+		secondsPerToken := intervalMs / (1000 * limit)
+		policyQuota = 1
+		policyWindow = secondsPerToken
+	} else {
+		policyQuota = tokensPerSecond
+		policyWindow = 1
+	}
+	policyHeader := fmt.Sprintf("%v, %v;window=%v; burst=%v;policy=\"leaky bucket\"", limit, policyQuota, policyWindow, burst)
 
 	// middleware
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
@@ -31,34 +43,23 @@ func RateLimit(limit int, burst int, intervalS int) Handler {
 		if store.Has(ip) && store.Get(ip).Expiry.After(currentTime) {
 			counter = store.Get(ip)
 		} else {
-			// counter = &IPBucket{Expiry: time.Now().Add(time.Duration(periodMs) * time.Millisecond)}
-			counter = NewIPBucket(limit, burst, intervalS)
+			counter = NewIPBucket(limit, burst, intervalMs)
 		}
 
 		// set headers
-		w.Header().Set("RateLimit-Limit", strconv.Itoa(limit))
-		// w.Header().Set("RateLimit-Remaining", strconv.Itoa(int(math.Max(float64(limit-counter.Connections-1), 0.0))))
-		// w.Header().Set("RateLimit-Reset", strconv.Itoa(int(int64(counter.Expiry.Sub(currentTime))/1000000000)))
+		w.Header().Set("RateLimit-Limit", policyHeader)
 
 		// send 429 if too many requests
-		// if counter.Connections >= limit {
-		// 	http.Error(w, "Connection limit exceeded. Please try again later.", http.StatusTooManyRequests)
-		// 	return
-		// }
 		errToken := counter.RemoveToken()
 		if errToken != nil {
 			http.Error(w, "Connection limit exceeded. Please try again later.", http.StatusTooManyRequests)
 			return
 		}
 
-		// // increment counter
-		// counter.Connections++
-
 		// upload counter to store
 		store.Set(ip, counter)
 
 		next()
-
 	}
 }
 
