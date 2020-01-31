@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-// interval also sets the rate of the IPStore cleanup. As a result, avoid using an extremely small value.
+// interval also sets the rate of the ExpirableStore cleanup. As a result, avoid using an extremely small value.
 func RateLimit(limit int, burst int, interval time.Duration) Handler {
 
 	// instantiate store to save IP/counter pairs
-	store := NewIPStore(interval)
+	store := NewExpirableStore(interval)
 
 	// approximate limit policy
 	var policyQuota, policyWindow int
@@ -36,9 +36,15 @@ func RateLimit(limit int, burst int, interval time.Duration) Handler {
 		ip := getIPAddress(r)
 
 		// retrieve counter and/or reset/init if invalid
-		var counter *IPBucket
+		var (
+			counter *IPBucket
+			ok      bool
+		)
 		if store.Has(ip) && !store.Get(ip).IsExpired() {
-			counter = store.Get(ip)
+			counter, ok = store.Get(ip).(*IPBucket)
+			if !ok {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
 		} else {
 			counter = NewIPBucket(limit, burst, interval)
 		}

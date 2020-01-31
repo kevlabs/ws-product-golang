@@ -1,4 +1,4 @@
-/* IPStore struct
+/* ExpirableStore struct
  * self-cleaning based on specified lifespan
  * implemented using two maps (constant time lookup), each with a different expiry - See InnerStore struct below
  */
@@ -10,37 +10,42 @@ import (
 	"time"
 )
 
-type IPStore struct {
+type ExpirableStore struct {
 	sync.Mutex
 	lifespan     time.Duration
-	currentStore *InnerIPStore
-	nextStore    *InnerIPStore
+	currentStore *InnerExpirableStore
+	nextStore    *InnerExpirableStore
 }
 
-func NewIPStore(lifespan time.Duration) *IPStore {
-	s := &IPStore{lifespan: lifespan}
+type Expirable interface {
+	Expiry() time.Time
+	IsExpired() bool
+}
+
+func NewExpirableStore(lifespan time.Duration) *ExpirableStore {
+	s := &ExpirableStore{lifespan: lifespan}
 	s.reset()
 	return s
 }
 
 // PUBLIC API
 
-func (s *IPStore) Has(key string) bool {
+func (s *ExpirableStore) Has(key string) bool {
 	return s.nextStore.Has(key) || s.currentStore.Has(key)
 }
 
-// returns zero-value IPBucket if not set
+// returns zero-value Expirable if not set
 // nextStore always takes precedence over currentStore in data retrieval
-func (s *IPStore) Get(key string) *IPBucket {
+func (s *ExpirableStore) Get(key string) Expirable {
 	if s.nextStore.Has(key) {
 		return s.nextStore.Get(key)
 	}
 	return s.currentStore.Get(key)
 }
 
-func (s *IPStore) Set(key string, bucket *IPBucket) *IPStore {
-	// determine in which store to save key/bucket pair
-	store := s.getStore(bucket)
+func (s *ExpirableStore) Set(key string, value Expirable) *ExpirableStore {
+	// determine in which store to save key/value pair
+	store := s.getStore(value)
 
 	// delete key in nextStore if for whatever reason the expiry has been curtailed
 	// and now the value needs to be stored in current store
@@ -49,11 +54,11 @@ func (s *IPStore) Set(key string, bucket *IPBucket) *IPStore {
 		s.nextStore.Delete(key)
 	}
 
-	store.Set(key, bucket)
+	store.Set(key, value)
 	return s
 }
 
-func (s *IPStore) Delete(key string) *IPStore {
+func (s *ExpirableStore) Delete(key string) *ExpirableStore {
 	s.currentStore.Delete(key)
 	s.nextStore.Delete(key)
 	return s
@@ -61,12 +66,12 @@ func (s *IPStore) Delete(key string) *IPStore {
 
 // UNEXPORTED/PRIVATE METHODS
 
-func (s *IPStore) createStore(expiry time.Time) *InnerIPStore {
-	return NewInnerIPStore(expiry)
+func (s *ExpirableStore) createStore(expiry time.Time) *InnerExpirableStore {
+	return NewInnerExpirableStore(expiry)
 }
 
 // init or roll stores over
-func (s *IPStore) reset() *IPStore {
+func (s *ExpirableStore) reset() *ExpirableStore {
 
 	s.Lock()
 
@@ -97,7 +102,7 @@ func (s *IPStore) reset() *IPStore {
 	return s
 }
 
-func (s *IPStore) cleanup() {
+func (s *ExpirableStore) cleanup() {
 	ticker := time.NewTicker(s.lifespan)
 
 	for {
@@ -107,12 +112,12 @@ func (s *IPStore) cleanup() {
 	}
 }
 
-// returns most current store that can accomodate bucket's expiry, or next store if key does not exist
-func (s *IPStore) getStore(bucket *IPBucket) *InnerIPStore {
+// returns most current store that can accomodate expirable's expiry, or next store if key does not exist
+func (s *ExpirableStore) getStore(value Expirable) *InnerExpirableStore {
 	s.Lock()
 	defer s.Unlock()
 
-	if bucket.Expiry.Before(s.currentStore.expiry) {
+	if value.Expiry().Before(s.currentStore.expiry) {
 		return s.currentStore
 	}
 
@@ -120,46 +125,46 @@ func (s *IPStore) getStore(bucket *IPBucket) *InnerIPStore {
 }
 
 // store implemented using a map (constant-time lookup)
-type InnerIPStore struct {
+type InnerExpirableStore struct {
 	sync.Mutex
 	expiry time.Time
-	data   map[string]*IPBucket
+	data   map[string]Expirable
 }
 
-func NewInnerIPStore(expiry time.Time) *InnerIPStore {
-	s := &InnerIPStore{expiry: expiry}
-	s.data = make(map[string]*IPBucket)
+func NewInnerExpirableStore(expiry time.Time) *InnerExpirableStore {
+	s := &InnerExpirableStore{expiry: expiry}
+	s.data = make(map[string]Expirable)
 	return s
 }
 
-func (s *InnerIPStore) Has(key string) bool {
+func (s *InnerExpirableStore) Has(key string) bool {
 	s.Lock()
 	_, ok := s.data[key]
 	s.Unlock()
 	return ok
 }
 
-func (s *InnerIPStore) Get(key string) *IPBucket {
+func (s *InnerExpirableStore) Get(key string) Expirable {
 	s.Lock()
 	data := s.data[key]
 	s.Unlock()
 	return data
 }
 
-func (s *InnerIPStore) Set(key string, bucket *IPBucket) *InnerIPStore {
+func (s *InnerExpirableStore) Set(key string, value Expirable) *InnerExpirableStore {
 	s.Lock()
-	s.data[key] = bucket
+	s.data[key] = value
 	s.Unlock()
 	return s
 }
 
-func (s *InnerIPStore) Delete(key string) *InnerIPStore {
+func (s *InnerExpirableStore) Delete(key string) *InnerExpirableStore {
 	s.Lock()
 	delete(s.data, key)
 	s.Unlock()
 	return s
 }
 
-func (s *InnerIPStore) IsExpired() bool {
+func (s *InnerExpirableStore) IsExpired() bool {
 	return !time.Now().Before(s.expiry)
 }

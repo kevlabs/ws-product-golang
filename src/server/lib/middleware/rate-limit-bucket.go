@@ -15,7 +15,7 @@ import (
 
 type IPBucket struct {
 	sync.Mutex
-	Expiry   time.Time
+	expiry   time.Time
 	limit    int
 	interval time.Duration
 	bucket   chan time.Time
@@ -36,6 +36,11 @@ func NewIPBucket(limit int, burst int, interval time.Duration) *IPBucket {
 	fmt.Println("BUCKET CREATED")
 
 	return b
+}
+
+// expiry getter
+func (b *IPBucket) Expiry() time.Time {
+	return b.expiry
 }
 
 // fill to capacity
@@ -87,7 +92,7 @@ func (b *IPBucket) Stop() *IPBucket {
 
 func (b *IPBucket) setExpiry() *IPBucket {
 	b.Lock()
-	b.Expiry = time.Now().Add(b.interval)
+	b.expiry = time.Now().Add(b.interval)
 	b.Unlock()
 	return b
 }
@@ -95,7 +100,7 @@ func (b *IPBucket) setExpiry() *IPBucket {
 func (b *IPBucket) IsExpired() bool {
 	b.Lock()
 	defer b.Unlock()
-	return !b.Expiry.After(time.Now())
+	return !b.Expiry().After(time.Now())
 }
 
 func (b *IPBucket) addToken() error {
