@@ -29,6 +29,7 @@ func ViewHandler(c *counters.ContentCounters, content []string) *mware.HandlerSe
 
 		// increment view counter
 		go c.AddView(contentType)
+		fmt.Fprintf(w, "Visited a page related to %v", contentType)
 
 		// simulate delay
 		err := processRequest(r)
@@ -44,6 +45,9 @@ func ViewHandler(c *counters.ContentCounters, content []string) *mware.HandlerSe
 			if err != nil {
 				return
 			}
+			fmt.Fprint(w, " and clicked.\n")
+		} else {
+			fmt.Fprint(w, ".\n")
 		}
 	}
 

@@ -1,17 +1,21 @@
+/*
+Find in this file logic related to the rate limit middleware
+Implements the token bucket algorithm (https://en.wikipedia.org/wiki/Token_bucket) with go's channels
+*/
+
 package middleware
 
 import (
-	"math"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 )
 
-func RateLimit(limit int, periodMs int) Handler {
+func RateLimit(limit int, burst int, intervalS int) Handler {
 
 	// instantiate store to save IP/counter pairs
-	store := NewIPStore(periodMs)
+	store := NewIPStore(intervalS)
 
 	// middleware
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
@@ -23,26 +27,32 @@ func RateLimit(limit int, periodMs int) Handler {
 		}
 
 		// retrieve counter and/or reset/init if invalid
-		var counter *IPRecord
+		var counter *IPBucket
 		if store.Has(ip) && store.Get(ip).Expiry.After(currentTime) {
 			counter = store.Get(ip)
 		} else {
-			counter = &IPRecord{Expiry: time.Now().Add(time.Duration(periodMs) * time.Millisecond)}
+			// counter = &IPBucket{Expiry: time.Now().Add(time.Duration(periodMs) * time.Millisecond)}
+			counter = NewIPBucket(limit, burst, intervalS)
 		}
 
 		// set headers
 		w.Header().Set("RateLimit-Limit", strconv.Itoa(limit))
-		w.Header().Set("RateLimit-Remaining", strconv.Itoa(int(math.Max(float64(limit-counter.Connections-1), 0.0))))
-		w.Header().Set("RateLimit-Reset", strconv.Itoa(int(int64(counter.Expiry.Sub(currentTime))/1000000000)))
+		// w.Header().Set("RateLimit-Remaining", strconv.Itoa(int(math.Max(float64(limit-counter.Connections-1), 0.0))))
+		// w.Header().Set("RateLimit-Reset", strconv.Itoa(int(int64(counter.Expiry.Sub(currentTime))/1000000000)))
 
 		// send 429 if too many requests
-		if counter.Connections >= limit {
+		// if counter.Connections >= limit {
+		// 	http.Error(w, "Connection limit exceeded. Please try again later.", http.StatusTooManyRequests)
+		// 	return
+		// }
+		errToken := counter.RemoveToken()
+		if errToken != nil {
 			http.Error(w, "Connection limit exceeded. Please try again later.", http.StatusTooManyRequests)
 			return
 		}
 
-		// increment counter
-		counter.Connections++
+		// // increment counter
+		// counter.Connections++
 
 		// upload counter to store
 		store.Set(ip, counter)

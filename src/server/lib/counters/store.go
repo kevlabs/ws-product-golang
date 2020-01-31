@@ -57,7 +57,7 @@ func UploadCounters(c *ContentCounters, s *CountersStore, intervalS int, done ch
 
 		// await ticker
 		case <-ticker.C:
-			fmt.Printf("%v seconds have elapsed\n", intervalS)
+			// fmt.Printf("%v seconds have elapsed\n", intervalS)
 
 			// create channel
 			incomingCounters := make(chan KeyCounters)
