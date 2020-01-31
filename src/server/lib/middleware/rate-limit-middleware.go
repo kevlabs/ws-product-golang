@@ -28,7 +28,7 @@ func RateLimit(limit int, burst int, interval time.Duration) Handler {
 		policyQuota = limit
 		policyWindow = int(intervalS)
 	}
-	policyHeader := fmt.Sprintf("%v, %v;window=%v; burst=%v;policy=\"leaky bucket\"", limit, policyQuota, policyWindow, burst)
+	policyHeader := fmt.Sprintf("%v, %v; window=%v; burst=%v; policy=\"leaky bucket\"", limit, policyQuota, policyWindow, burst)
 
 	// middleware
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
