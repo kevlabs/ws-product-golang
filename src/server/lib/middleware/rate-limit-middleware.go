@@ -14,7 +14,7 @@ import (
 // interval also sets the rate of the ExpirableStore cleanup. As a result, avoid using an extremely small value.
 func RateLimit(limit int, burst int, interval time.Duration) Handler {
 
-	// instantiate store to save IP/counter pairs
+	// instantiate store to save IP/bucket pairs
 	store := NewExpirableStore(interval)
 
 	// approximate limit policy
@@ -35,32 +35,32 @@ func RateLimit(limit int, burst int, interval time.Duration) Handler {
 
 		ip := getIPAddress(r)
 
-		// retrieve counter and/or reset/init if invalid
+		// retrieve bucket and/or reset/init if invalid
 		var (
-			counter *IPBucket
-			ok      bool
+			bucket *IPBucket
+			ok     bool
 		)
 		if store.Has(ip) && !store.Get(ip).IsExpired() {
-			counter, ok = store.Get(ip).(*IPBucket)
+			bucket, ok = store.Get(ip).(*IPBucket)
 			if !ok {
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		} else {
-			counter = NewIPBucket(limit, burst, interval)
+			bucket = NewIPBucket(limit, burst, interval)
 		}
 
 		// set headers
 		w.Header().Set("RateLimit-Limit", policyHeader)
 
 		// send 429 if too many requests
-		errToken := counter.RemoveToken()
+		errToken := bucket.RemoveToken()
 		if errToken != nil {
 			http.Error(w, "Connection limit exceeded. Please try again later.", http.StatusTooManyRequests)
 			return
 		}
 
-		// upload counter to store
-		store.Set(ip, counter)
+		// upload bucket to store
+		store.Set(ip, bucket)
 
 		next()
 	}
