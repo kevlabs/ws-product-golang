@@ -157,5 +157,5 @@ func (s *InnerIPStore) Delete(key string) *InnerIPStore {
 }
 
 func (s *InnerIPStore) IsExpired() bool {
-	return time.Now().After(s.expiry) || time.Now().Equal(s.expiry)
+	return !time.Now().Before(s.expiry)
 }

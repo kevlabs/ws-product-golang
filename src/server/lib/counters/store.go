@@ -56,6 +56,7 @@ func UploadCounters(c *ContentCounters, s *CountersStore, intervalMs int, done c
 		select {
 		// exit process if done
 		case <-done:
+			ticker.Stop()
 			return
 
 		// await ticker

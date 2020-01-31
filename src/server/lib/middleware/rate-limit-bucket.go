@@ -8,6 +8,7 @@ package middleware
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -31,6 +32,9 @@ func NewIPBucket(limit int, burst int, intervalMs int) *IPBucket {
 	// start refill process
 	go b.Start()
 
+	// REMOVE
+	fmt.Println("BUCKET CREATED")
+
 	return b
 }
 
@@ -50,10 +54,20 @@ func (b *IPBucket) Fill() *IPBucket {
 func (b *IPBucket) Start() {
 	ticker := time.NewTicker(time.Duration(b.intervalMs/b.limit) * time.Millisecond)
 	for {
+
+		// call stop if bucket has expired
+		if b.IsExpired() {
+			go b.Stop()
+		}
+
 		select {
 		case <-b.done:
 			ticker.Stop()
 			close(b.bucket)
+
+			// REMOVE
+			fmt.Println("BUCKET CLOSED")
+			return
 
 		case <-ticker.C:
 			// add token
@@ -78,8 +92,13 @@ func (b *IPBucket) setExpiry() *IPBucket {
 	return b
 }
 
+func (b *IPBucket) IsExpired() bool {
+	b.Lock()
+	defer b.Unlock()
+	return !b.Expiry.After(time.Now())
+}
+
 func (b *IPBucket) AddToken() error {
-	b.setExpiry()
 	select {
 	case b.bucket <- time.Now():
 		// token added

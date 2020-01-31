@@ -7,11 +7,10 @@ package middleware
 
 import (
 	"fmt"
-	"net"
 	"net/http"
-	"time"
 )
 
+// intervalMs also sets the rate of the IPStore cleanup. As a result, avoid using an extremely small value.
 func RateLimit(limit int, burst int, intervalMs int) Handler {
 
 	// instantiate store to save IP/counter pairs
@@ -32,15 +31,11 @@ func RateLimit(limit int, burst int, intervalMs int) Handler {
 	// middleware
 	return func(w http.ResponseWriter, r *http.Request, next func()) {
 
-		currentTime := time.Now()
-		ip, err := getIPAddress(r)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+		ip := getIPAddress(r)
 
 		// retrieve counter and/or reset/init if invalid
 		var counter *IPBucket
-		if store.Has(ip) && store.Get(ip).Expiry.After(currentTime) {
+		if store.Has(ip) && !store.Get(ip).IsExpired() {
 			counter = store.Get(ip)
 		} else {
 			counter = NewIPBucket(limit, burst, intervalMs)
@@ -63,20 +58,11 @@ func RateLimit(limit int, burst int, intervalMs int) Handler {
 	}
 }
 
-func getIPAddress(r *http.Request) (string, error) {
-	var address string
+func getIPAddress(r *http.Request) string {
 	// check forwarded header in case user behind proxy
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		address = forwarded
-	} else {
-		address = r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		return forwarded
 	}
 
-	IPAddress, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return "", err
-	}
-
-	return IPAddress, nil
+	return r.RemoteAddr
 }
