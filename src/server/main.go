@@ -20,11 +20,6 @@ func welcomeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Welcome to EQ Works 😎")
 }
 
-func printCounters(w http.ResponseWriter, r *http.Request, next func()) {
-	// do nothing
-	next()
-}
-
 func router() mware.Handler {
 
 	var mux *http.ServeMux = http.NewServeMux()
@@ -44,7 +39,7 @@ func main() {
 	go counters.UploadCounters(liveCounters, countersStore, 5000, stopUpload)
 
 	// register app-level middleware
-	http.Handle("/", mware.UseHandlers(mware.Logger, printCounters, router()))
+	http.Handle("/", mware.UseHandlers(mware.Logger, router()))
 
 	// start server
 	log.Fatal(http.ListenAndServe(":8080", mware.ListenHandler(8080)))
