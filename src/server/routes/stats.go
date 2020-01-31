@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/kevlabs/eq-golang-server/src/server/lib/counters"
 	mware "github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
@@ -17,5 +18,5 @@ func StatsHandler(c *counters.ContentCounters, s *counters.CountersStore, conten
 	// use rate-limit middleware
 	// bucket burst: 5, refill rate: 0.25/s (for reference Shopify's API has a burst of 40 and a refill rate of 2/s)
 	// rate is voluntarily low for dev purposes
-	return mware.UseHandlers(mware.RateLimit(100, 5, 400000), mware.WrapHttpHandler(statsHandler))
+	return mware.UseHandlers(mware.RateLimit(75, 5, 5*time.Minute), mware.WrapHttpHandler(statsHandler))
 }

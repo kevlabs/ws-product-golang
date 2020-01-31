@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/kevlabs/eq-golang-server/src/server/lib/counters"
 	mware "github.com/kevlabs/eq-golang-server/src/server/lib/middleware"
@@ -36,7 +37,7 @@ func main() {
 
 	stopUpload := make(chan bool)
 	// upload to store every 5 seconds
-	go counters.UploadCounters(liveCounters, countersStore, 5000, stopUpload)
+	go counters.UploadCounters(liveCounters, countersStore, 5*time.Second, stopUpload)
 
 	// register app-level middleware
 	http.Handle("/", mware.UseHandlers(mware.Logger, router()))

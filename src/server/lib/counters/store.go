@@ -48,9 +48,9 @@ func (s *CountersStore) PrintAll() *CountersStore {
 	return s
 }
 
-func UploadCounters(c *ContentCounters, s *CountersStore, intervalMs int, done chan bool) {
+func UploadCounters(c *ContentCounters, s *CountersStore, interval time.Duration, done chan bool) {
 
-	ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
+	ticker := time.NewTicker(interval)
 
 	for {
 		select {
@@ -61,7 +61,7 @@ func UploadCounters(c *ContentCounters, s *CountersStore, intervalMs int, done c
 
 		// await ticker
 		case <-ticker.C:
-			// fmt.Printf("%v seconds have elapsed\n", intervalMs / 1000)
+			fmt.Printf("%v seconds have elapsed\n", float64(interval)/float64(time.Second))
 
 			// create channel
 			incomingCounters := make(chan KeyCounters)

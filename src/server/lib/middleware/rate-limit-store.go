@@ -12,13 +12,13 @@ import (
 
 type IPStore struct {
 	sync.Mutex
-	lifespanMs   int
+	lifespan     time.Duration
 	currentStore *InnerIPStore
 	nextStore    *InnerIPStore
 }
 
-func NewIPStore(lifespanMs int) *IPStore {
-	s := &IPStore{lifespanMs: lifespanMs}
+func NewIPStore(lifespan time.Duration) *IPStore {
+	s := &IPStore{lifespan: lifespan}
 	s.reset()
 	return s
 }
@@ -30,6 +30,7 @@ func (s *IPStore) Has(key string) bool {
 }
 
 // returns zero-value IPBucket if not set
+// nextStore always takes precedence over currentStore in data retrieval
 func (s *IPStore) Get(key string) *IPBucket {
 	if s.nextStore.Has(key) {
 		return s.nextStore.Get(key)
@@ -38,8 +39,17 @@ func (s *IPStore) Get(key string) *IPBucket {
 }
 
 func (s *IPStore) Set(key string, bucket *IPBucket) *IPStore {
-	// determines in which store to save key/bucket pair
-	s.getStore(bucket).Set(key, bucket)
+	// determine in which store to save key/bucket pair
+	store := s.getStore(bucket)
+
+	// delete key in nextStore if for whatever reason the expiry has been curtailed
+	// and now the value needs to be stored in current store
+	// no need to worry about currentStore as nextStore always takes precedence in data retrieval
+	if s.nextStore.Has(key) && store != s.nextStore {
+		s.nextStore.Delete(key)
+	}
+
+	store.Set(key, bucket)
 	return s
 }
 
@@ -62,8 +72,8 @@ func (s *IPStore) reset() *IPStore {
 
 	// init
 	if s.currentStore == nil {
-		currentExpiry := time.Now().Add(time.Duration(s.lifespanMs) * time.Millisecond)
-		nextExpiry := currentExpiry.Add(time.Duration(s.lifespanMs) * time.Millisecond)
+		currentExpiry := time.Now().Add(s.lifespan)
+		nextExpiry := currentExpiry.Add(s.lifespan)
 
 		s.currentStore = s.createStore(currentExpiry)
 		s.nextStore = s.createStore(nextExpiry)
@@ -77,7 +87,7 @@ func (s *IPStore) reset() *IPStore {
 	}
 
 	// rollover
-	nextExpiry := time.Now().Add(time.Duration(2*s.lifespanMs) * time.Millisecond)
+	nextExpiry := time.Now().Add(2 * s.lifespan)
 
 	s.currentStore = s.nextStore
 	s.nextStore = s.createStore(nextExpiry)
@@ -88,7 +98,7 @@ func (s *IPStore) reset() *IPStore {
 }
 
 func (s *IPStore) cleanup() {
-	ticker := time.NewTicker(time.Duration(s.lifespanMs) * time.Millisecond)
+	ticker := time.NewTicker(s.lifespan)
 
 	for {
 		// await ticker
@@ -107,12 +117,6 @@ func (s *IPStore) getStore(bucket *IPBucket) *InnerIPStore {
 	}
 
 	return s.nextStore
-}
-
-type IPRecord struct {
-	sync.Mutex
-	Expiry      time.Time
-	Connections int
 }
 
 // store implemented using a map (constant-time lookup)

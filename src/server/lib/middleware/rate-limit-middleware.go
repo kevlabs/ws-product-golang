@@ -8,23 +8,25 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
-// intervalMs also sets the rate of the IPStore cleanup. As a result, avoid using an extremely small value.
-func RateLimit(limit int, burst int, intervalMs int) Handler {
+// interval also sets the rate of the IPStore cleanup. As a result, avoid using an extremely small value.
+func RateLimit(limit int, burst int, interval time.Duration) Handler {
 
 	// instantiate store to save IP/counter pairs
-	store := NewIPStore(intervalMs)
+	store := NewIPStore(interval)
 
 	// approximate limit policy
 	var policyQuota, policyWindow int
-	if tokensPerSecond := 1000 * limit / intervalMs; tokensPerSecond == 0 {
-		secondsPerToken := intervalMs / (1000 * limit)
-		policyQuota = 1
-		policyWindow = secondsPerToken
-	} else {
-		policyQuota = tokensPerSecond
+	// if tokensPerSecond := 1000 * limit / intervalMs; tokensPerSecond == 0 {
+	if intervalS := float64(interval) / float64(time.Second); intervalS < 1.0 {
+		// secondsPerToken := intervalMs / (1000 * limit)
+		policyQuota = int(float64(limit) / intervalS)
 		policyWindow = 1
+	} else {
+		policyQuota = limit
+		policyWindow = int(intervalS)
 	}
 	policyHeader := fmt.Sprintf("%v, %v;window=%v; burst=%v;policy=\"leaky bucket\"", limit, policyQuota, policyWindow, burst)
 
@@ -38,7 +40,7 @@ func RateLimit(limit int, burst int, intervalMs int) Handler {
 		if store.Has(ip) && !store.Get(ip).IsExpired() {
 			counter = store.Get(ip)
 		} else {
-			counter = NewIPBucket(limit, burst, intervalMs)
+			counter = NewIPBucket(limit, burst, interval)
 		}
 
 		// set headers
