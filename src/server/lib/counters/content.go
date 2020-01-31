@@ -38,19 +38,21 @@ func NewContentCounters() *ContentCounters {
 }
 
 // clear does not lock map to prevent deadlocks (caller should take care of locking)
-func (c *ContentCounters) clear() {
+func (c *ContentCounters) clear() *ContentCounters {
 	c.data = make(map[string]*Counters)
+	return c
 }
 
 // reset data field to an empty map
-func (c *ContentCounters) Clear() {
+func (c *ContentCounters) Clear() *ContentCounters {
 	c.Lock()
 	c.clear()
 	c.Unlock()
+	return c
 }
 
 // iterate over data and send it over supplied channel
-func (c *ContentCounters) Download(channel chan KeyCounters, clear bool) {
+func (c *ContentCounters) Download(channel chan KeyCounters, clear bool) *ContentCounters {
 	c.Lock()
 	for key, counters := range c.data {
 		channel <- KeyCounters{key, CountersValue{counters.view, counters.click}}
@@ -62,6 +64,7 @@ func (c *ContentCounters) Download(channel chan KeyCounters, clear bool) {
 	}
 
 	c.Unlock()
+	return c
 }
 
 // retrieve counters based on content type and time
@@ -81,20 +84,22 @@ func (c *ContentCounters) getCounters(content string) *Counters {
 	return counters
 }
 
-func (c *ContentCounters) AddView(content string) {
+func (c *ContentCounters) AddView(content string) *ContentCounters {
 	counters := c.getCounters(content)
 
 	counters.Lock()
 	counters.view++
 	counters.Unlock()
 
+	return c
 }
 
-func (c *ContentCounters) AddClick(content string) {
+func (c *ContentCounters) AddClick(content string) *ContentCounters {
 	counters := c.getCounters(content)
 
 	counters.Lock()
 	counters.click++
 	counters.Unlock()
 
+	return c
 }

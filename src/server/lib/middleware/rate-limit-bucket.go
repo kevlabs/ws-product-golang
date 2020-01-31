@@ -34,7 +34,8 @@ func NewIPBucket(limit int, burst int, intervalS int) *IPBucket {
 	return b
 }
 
-func (b *IPBucket) Fill() {
+// fill to capacity
+func (b *IPBucket) Fill() *IPBucket {
 	notFull := true
 	for notFull {
 		err := b.AddToken()
@@ -42,8 +43,10 @@ func (b *IPBucket) Fill() {
 			notFull = false
 		}
 	}
+	return b
 }
 
+// start auto-refilling process
 func (b *IPBucket) Start() {
 	ticker := time.NewTicker(time.Duration(b.intervalS/b.limit) * time.Second)
 	for {
@@ -63,14 +66,16 @@ func (b *IPBucket) Start() {
 	}
 }
 
-func (b *IPBucket) Stop() {
+func (b *IPBucket) Stop() *IPBucket {
 	b.done <- true
+	return b
 }
 
-func (b *IPBucket) setExpiry() {
+func (b *IPBucket) setExpiry() *IPBucket {
 	b.Lock()
 	b.Expiry = time.Now().Add(time.Duration(b.intervalS) * time.Second)
 	b.Unlock()
+	return b
 }
 
 func (b *IPBucket) AddToken() error {

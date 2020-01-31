@@ -24,25 +24,28 @@ func NewCountersStore() *CountersStore {
 	return s
 }
 
-func (s *CountersStore) Upload(data KeyCounters) {
+func (s *CountersStore) Upload(data KeyCounters) *CountersStore {
 	s.Lock()
 	s.data = append(s.data, data)
 	s.Unlock()
+	return s
 }
 
-func (s *CountersStore) WriteAll(w io.Writer) {
+func (s *CountersStore) WriteAll(w io.Writer) *CountersStore {
 	s.Lock()
 	// build data string
 	for _, data := range s.data {
 		fmt.Fprintf(w, "Key: %v, Views: %v, Clicks: %v\n", data.key, data.counters.view, data.counters.click)
 	}
 	s.Unlock()
+	return s
 }
 
-func (s *CountersStore) PrintAll() {
+func (s *CountersStore) PrintAll() *CountersStore {
 	var allCounters strings.Builder
 	s.WriteAll(&allCounters)
 	fmt.Print(allCounters.String())
+	return s
 }
 
 func UploadCounters(c *ContentCounters, s *CountersStore, intervalS int, done chan bool) {

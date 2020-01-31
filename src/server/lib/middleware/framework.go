@@ -4,12 +4,14 @@ import (
 	"net/http"
 )
 
+// middleware handler type
 type Handler func(http.ResponseWriter, *http.Request, func())
 
 type HandlerSeries struct {
 	handlers []Handler
 }
 
+// Handler implements the http.Handler interface
 func (s *HandlerSeries) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	nextHandlerIndex := 0
 
@@ -27,6 +29,7 @@ func (s *HandlerSeries) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	next()
 }
 
+// register all handlers (e.g. at route or app level)
 func UseHandlers(handlers ...Handler) *HandlerSeries {
 	return &HandlerSeries{handlers}
 }
